@@ -11,9 +11,24 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         input_line
             .chars()
             .any(|c| c.is_ascii_alphanumeric() || c == '_')
+    } else if let Some(pcg) = extract_pcg(pattern) {
+        input_line.contains(|c| pcg.contains(c))
     } else {
         panic!("Unhandled pattern: {}", pattern)
     }
+}
+
+/// Extracts the positive character group from the pattern.
+fn extract_pcg(pattern: &str) -> Option<&str> {
+    if pattern.starts_with('[') && pattern.ends_with(']') && pattern.len() > 2 {
+        let chars = pattern
+            .strip_prefix('[')
+            .unwrap()
+            .strip_suffix(']')
+            .unwrap();
+        return Some(chars);
+    }
+    None
 }
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
