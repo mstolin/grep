@@ -11,6 +11,9 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
         input_line
             .chars()
             .any(|c| c.is_ascii_alphanumeric() || c == '_')
+    } else if let Some(ncg) = extract_ncg(pattern) {
+        // Does input contain any char, that is not in ncg? -> true
+        input_line.chars().any(|c| !ncg.contains(c))
     } else if let Some(pcg) = extract_pcg(pattern) {
         input_line.contains(|c| pcg.contains(c))
     } else {
@@ -18,17 +21,38 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
     }
 }
 
-/// Extracts the positive character group from the pattern.
+/// Checks if `pattern` is a positive character group.
+/// Example: [abc]
+fn is_pcg(pattern: &str) -> bool {
+    pattern.starts_with('[') && pattern.ends_with(']') && pattern.len() > 2 && !is_ncg(pattern)
+}
+
+/// Checks if `pattern` is a negative character group.
+/// Example: [^abc]
+fn is_ncg(pattern: &str) -> bool {
+    let mut chars = pattern.chars();
+    chars.next() == Some('[')
+        && chars.next() == Some('^')
+        && chars.last() == Some(']')
+        && pattern.len() > 3
+}
+
+/// Extracts the characters from the positive character group.
 fn extract_pcg(pattern: &str) -> Option<&str> {
-    if pattern.starts_with('[') && pattern.ends_with(']') && pattern.len() > 2 {
-        let chars = pattern
-            .strip_prefix('[')
-            .unwrap()
-            .strip_suffix(']')
-            .unwrap();
-        return Some(chars);
+    if !is_pcg(pattern) {
+        return None;
     }
-    None
+    let end = pattern.len() - 1;
+    Some(&pattern[1..end])
+}
+
+/// Extracts the characters from the negative character group.
+fn extract_ncg(pattern: &str) -> Option<&str> {
+    if !is_ncg(pattern) {
+        return None;
+    }
+    let end = pattern.len() - 1;
+    Some(&pattern[2..end])
 }
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
