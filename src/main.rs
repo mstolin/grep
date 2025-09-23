@@ -1,8 +1,15 @@
+use std::char;
 use std::env;
 use std::io;
 use std::process;
 
 use anyhow::anyhow;
+
+/* TODO List:
+  [] Custom structs for specifc pattern types (e.g. character groups)
+  [] Custom error types
+  [] Make iterators AsRef
+*/
 
 fn do_match(
     mut input_iter: impl Iterator<Item = char>,
@@ -10,28 +17,21 @@ fn do_match(
 ) -> Result<bool, anyhow::Error> {
     while let Some(pattern_char) = pattern_iter.next() {
         if pattern_char == '\\' {
-            let input_char = if let Some(input_char) = input_iter.next() {
-                input_char
-            } else {
-                return Err(anyhow!("Input has unsufficient length"));
-            };
             match pattern_iter.next() {
                 Some('d') => {
-                    if !input_char.is_ascii_digit() {
+                    if !until_digit(input_iter.by_ref()) {
                         return Ok(false);
                     }
                 }
                 Some('w') => {
-                    if !(input_char.is_ascii_alphanumeric() || input_char == '_') {
+                    if !until_alphanumeric(input_iter.by_ref()) {
                         return Ok(false);
                     }
                 }
                 Some('\\') => {
                     // input is a special char that requires escape
                     // TODO check allows special chars
-                    if input_char != '\\' {
-                        return Ok(false);
-                    }
+                    todo!();
                 }
                 _ => return Err(anyhow!("Unhandled pattern")),
             }
@@ -54,21 +54,41 @@ fn do_match(
             };
             return Ok(res);
         } else if pattern_char.is_ascii() {
-            let input_char = if let Some(input_char) = input_iter.next() {
-                input_char
-            } else {
-                return Err(anyhow!("Input has unsufficient length"));
-            };
-            // check for the exact match
-            if pattern_char != input_char {
+            if !until_exact(&pattern_char, input_iter.by_ref()) {
                 return Ok(false);
             }
         } else {
             return Err(anyhow!("Unhandled pattern"));
         }
     }
-    // Iterators have to be consumed
-    Ok(input_iter.count() == 0 && pattern_iter.count() == 0)
+    Ok(true)
+}
+
+fn until_match<F>(mut input_iter: impl Iterator<Item = char>, is_match: F) -> bool
+where
+    F: Fn(char) -> bool,
+{
+    while let Some(input_char) = input_iter.next() {
+        if is_match(input_char) {
+            return true;
+        }
+    }
+    false
+}
+
+// TODO Make as ref
+fn until_digit(input_iter: impl Iterator<Item = char>) -> bool {
+    until_match(input_iter, |c| c.is_ascii_digit())
+}
+
+// TODO Make as ref
+fn until_alphanumeric(input_iter: impl Iterator<Item = char>) -> bool {
+    until_match(input_iter, |c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+// TODO Make as ref
+fn until_exact(pattern: &char, input_iter: impl Iterator<Item = char>) -> bool {
+    until_match(input_iter, |c| c == *pattern)
 }
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
@@ -98,8 +118,10 @@ fn main() {
 
     // Uncomment this block to pass the first stage
     if match_pattern(&input_line, &pattern) {
+        println!("YES, there was a match");
         process::exit(0)
     } else {
+        println!("SORRY, no match");
         process::exit(1)
     }
 }
