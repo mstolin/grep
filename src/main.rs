@@ -2,26 +2,85 @@ use std::env;
 use std::io;
 use std::process;
 
-fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    let chars = &pattern.chars().collect::<Vec<_>>()[..];
+use anyhow::anyhow;
 
-    // TODO This is ugly
-    match pattern {
-        "\\d" => input_line.contains(char::is_numeric),
-        "\\w" => input_line
-            .chars()
-            .any(|c| c.is_ascii_alphanumeric() || c == '_'),
-        _ => match chars {
-            ['[', '^', ncg @ .., ']'] => input_line.chars().any(|c| !ncg.contains(&c)),
-            ['[', pcg @ .., ']'] => input_line.contains(|c| pcg.contains(&c)),
-            _ => {
-                if pattern.chars().count() == 1 {
-                    input_line.contains(pattern)
-                } else {
-                    panic!("Unhandled pattern: {}", pattern)
+fn do_match(
+    mut input_iter: impl Iterator<Item = char>,
+    mut pattern_iter: impl Iterator<Item = char>,
+) -> Result<bool, anyhow::Error> {
+    while let Some(pattern_char) = pattern_iter.next() {
+        if pattern_char == '\\' {
+            let input_char = if let Some(input_char) = input_iter.next() {
+                input_char
+            } else {
+                return Err(anyhow!("Input has unsufficient length"));
+            };
+            match pattern_iter.next() {
+                Some('d') => {
+                    if !input_char.is_ascii_digit() {
+                        return Ok(false);
+                    }
                 }
+                Some('w') => {
+                    if !(input_char.is_ascii_alphanumeric() || input_char == '_') {
+                        return Ok(false);
+                    }
+                }
+                Some('\\') => {
+                    // input is a special char that requires escape
+                    // TODO check allows special chars
+                    if input_char != '\\' {
+                        return Ok(false);
+                    }
+                }
+                _ => return Err(anyhow!("Unhandled pattern")),
             }
-        },
+        } else if pattern_char == '[' {
+            // check for character group
+            let mut char_group = pattern_iter
+                .by_ref()
+                .take_while(|c| *c != ']')
+                .collect::<Vec<_>>();
+            let is_neg = if let Some(pattern_first) = char_group.first() {
+                *pattern_first == '^'
+            } else {
+                false
+            };
+            let res = if is_neg {
+                char_group.remove(0);
+                input_iter.any(|c| !char_group.contains(&c))
+            } else {
+                input_iter.any(|c| char_group.contains(&c))
+            };
+            return Ok(res);
+        } else if pattern_char.is_ascii_alphanumeric() {
+            let input_char = if let Some(input_char) = input_iter.next() {
+                input_char
+            } else {
+                return Err(anyhow!("Input has unsufficient length"));
+            };
+            // check for the exact match
+            if pattern_char != input_char {
+                return Ok(false);
+            }
+        } else {
+            return Err(anyhow!("Unhandled pattern"));
+        }
+    }
+    // Iterators have to be consumed
+    Ok(input_iter.count() == 0 && pattern_iter.count() == 0)
+}
+
+fn match_pattern(input_line: &str, pattern: &str) -> bool {
+    let input_iter = input_line.chars();
+    let pattern_iter = pattern.chars();
+
+    match do_match(input_iter, pattern_iter) {
+        Ok(res) => {
+            println!("Result: {res}");
+            res
+        }
+        Err(e) => panic!("{e}: {pattern}"),
     }
 }
 
