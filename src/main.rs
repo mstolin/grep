@@ -11,6 +11,8 @@ use anyhow::anyhow;
   [] Make iterators AsRef
 */
 
+const ALLOWED_SPECIAL_CHARS: [char; 4] = ['[', ']', '\\', '^'];
+
 fn do_match(
     mut input_iter: impl Iterator<Item = char>,
     mut pattern_iter: impl Iterator<Item = char>,
@@ -28,12 +30,15 @@ fn do_match(
                         return Ok(false);
                     }
                 }
-                Some('\\') => {
+                Some(symbol) => {
                     // input is a special char that requires escape
-                    // TODO check allows special chars
-                    todo!();
+                    if !(ALLOWED_SPECIAL_CHARS.contains(&symbol)
+                        && until_exact(&symbol, input_iter.by_ref()))
+                    {
+                        return Ok(false);
+                    }
                 }
-                _ => return Err(anyhow!("Unhandled pattern")),
+                _ => return Err(anyhow!("Unhandlessd pattern")),
             }
         } else if pattern_char == '[' {
             // check for character group
@@ -96,10 +101,7 @@ fn match_pattern(input_line: &str, pattern: &str) -> bool {
     let pattern_iter = pattern.chars();
 
     match do_match(input_iter, pattern_iter) {
-        Ok(res) => {
-            println!("Result: {res}");
-            res
-        }
+        Ok(res) => res,
         Err(e) => panic!("{e}: {pattern}"),
     }
 }
@@ -118,10 +120,8 @@ fn main() {
 
     // Uncomment this block to pass the first stage
     if match_pattern(&input_line, &pattern) {
-        println!("YES, there was a match");
         process::exit(0)
     } else {
-        println!("SORRY, no match");
         process::exit(1)
     }
 }
