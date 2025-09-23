@@ -53,7 +53,7 @@ fn do_match(
                 input_iter.any(|c| char_group.contains(&c))
             };
             return Ok(res);
-        } else if pattern_char.is_ascii_alphanumeric() {
+        } else if pattern_char.is_ascii() {
             let input_char = if let Some(input_char) = input_iter.next() {
                 input_char
             } else {
