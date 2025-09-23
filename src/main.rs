@@ -18,7 +18,8 @@ fn do_match(
     mut pattern_iter: impl Iterator<Item = char>,
 ) -> Result<bool, anyhow::Error> {
     while let Some(pattern_char) = pattern_iter.next() {
-        if pattern_char == '\\' {
+        if pattern_char == '^' {
+        } else if pattern_char == '\\' {
             match pattern_iter.next() {
                 Some('d') => {
                     if !until_digit(input_iter.by_ref()) {
@@ -97,8 +98,18 @@ fn until_exact(pattern: &char, input_iter: impl Iterator<Item = char>) -> bool {
 }
 
 fn match_pattern(input_line: &str, pattern: &str) -> bool {
-    let input_iter = input_line.chars();
-    let pattern_iter = pattern.chars();
+    let mut input_iter = input_line.chars();
+    let mut pattern_iter = pattern.chars();
+
+    if pattern.starts_with('^') {
+        let _ = pattern_iter.next();
+        while let (Some(input_char), Some(pattern_char)) = (input_iter.next(), pattern_iter.next())
+        {
+            if input_char != pattern_char {
+                return false;
+            }
+        }
+    }
 
     match do_match(input_iter, pattern_iter) {
         Ok(res) => res,
