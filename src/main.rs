@@ -11,14 +11,16 @@ use anyhow::anyhow;
   [] Make iterators AsRef
 */
 
-const ALLOWED_SPECIAL_CHARS: [char; 4] = ['[', ']', '\\', '^'];
+const ALLOWED_SPECIAL_CHARS: [char; 5] = ['[', ']', '\\', '^', '$'];
 
 fn do_match(
     mut input_iter: impl Iterator<Item = char>,
     mut pattern_iter: impl Iterator<Item = char>,
 ) -> Result<bool, anyhow::Error> {
     while let Some(pattern_char) = pattern_iter.next() {
-        if pattern_char == '^' {
+        if pattern_char == '$' {
+            // end of string
+            return Ok(input_iter.next().is_none());
         } else if pattern_char == '\\' {
             match pattern_iter.next() {
                 Some('d') => {
