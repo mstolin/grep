@@ -66,7 +66,17 @@ fn do_match(
             return Ok(res);
         } else if pattern_char.is_ascii() {
             if let Some('+') = pattern_peek.peek() {
+                // Increase pattern iterator until a different symbol is found
                 let _ = pattern_peek.next();
+                while let Some(peek) = pattern_peek.peek() {
+                    if *peek == pattern_char {
+                        let _ = pattern_peek.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                // Increase input iterator as long as symbol is equal to pattern
                 while let Some(peek) = input_peek.peek() {
                     if *peek == pattern_char {
                         let _ = input_peek.next();
