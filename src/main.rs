@@ -4,33 +4,16 @@ use std::io;
 use std::iter::Peekable;
 use std::process;
 
+use crate::characters::*;
 use anyhow::anyhow;
+
+mod characters;
 
 /* TODO List:
   [] Custom structs for specifc pattern types (e.g. character groups)
   [] Custom error types
   [] Make iterators AsRef
 */
-
-const ANCHOR_START: char = '^';
-const ANCHOR_END: char = '$';
-const CHAR_CLASS_ALPHANUMERIC: char = 'w';
-const CHAR_CLASS_DIGIT: char = 'd';
-const CHAR_GROUP_START: char = '[';
-const CHAR_GROUP_END: char = ']';
-const ESCAPE_CHAR: char = '\\';
-const QUANTIFIER_NEG: char = '^';
-const QUANTIFIER_PLUS: char = '+';
-const QUANTIFIER_QUESTION: char = '?';
-const ALLOWED_SPECIAL_CHARS: [char; 7] = [
-    CHAR_GROUP_START,
-    CHAR_GROUP_END,
-    ESCAPE_CHAR,
-    ANCHOR_START,
-    ANCHOR_END,
-    QUANTIFIER_PLUS,
-    QUANTIFIER_QUESTION,
-];
 
 enum ModeLiteralMatch {
     One,
