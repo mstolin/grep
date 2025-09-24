@@ -1,4 +1,4 @@
-use std::iter::Peekable;
+use std::{collections::VecDeque, iter::Peekable};
 
 use anyhow::anyhow;
 
@@ -8,22 +8,25 @@ use crate::characters::*;
 enum Step {
     AnyAlphanumerical,
     AnyDigit,
+    CharGroup(Box<[char]>, bool),
     EndOfString,
     ExactChar(char),
     MinOrMore(char, usize),
-    CharGroup(Box<[char]>, bool),
+    StartOfString,
+    ZeroOrOne(char),
 }
 
-struct Context {
-    steps: Box<[Step]>,
+struct Regex {
+    steps: VecDeque<Step>,
 }
 
-impl Context {
+impl Regex {
     pub fn from(pattern: &str) -> Result<Self, anyhow::Error> {
         let mut steps = Vec::new();
         let mut iter = pattern.chars().peekable();
         while let Some(pattern_char) = iter.next() {
             match pattern_char {
+                ANCHOR_START => steps.push(Step::StartOfString),
                 ANCHOR_END => steps.push(Step::EndOfString),
                 ESCAPE_CHAR => {
                     if let Some(next) = iter.next() {
@@ -40,12 +43,12 @@ impl Context {
             };
         }
         Ok(Self {
-            steps: steps.into_boxed_slice(),
+            steps: VecDeque::from(steps),
         })
     }
 }
 
-impl Context {
+impl Regex {
     fn parse_escaped_char(escaped_char: char) -> Result<Step, anyhow::Error> {
         match escaped_char {
             CHAR_CLASS_ALPHANUMERIC => Ok(Step::AnyAlphanumerical),
@@ -71,6 +74,8 @@ impl Context {
                 n += 1;
             }
             Step::MinOrMore(exact_char, 1 + n)
+        } else if iter.next_if_eq(&QUANTIFIER_QUESTION).is_some() {
+            Step::ZeroOrOne(exact_char)
         } else {
             Step::ExactChar(exact_char)
         }
@@ -89,30 +94,35 @@ impl Context {
     }
 }
 
+impl IntoIterator for Regex {
+    type Item = Step;
+
+    type IntoIter = std::collections::vec_deque::IntoIter<Step>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.steps.into_iter()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_match_one_or_more_times() {
-        assert_eq!(
-            Context::from("ca+t").unwrap().steps,
-            vec![
-                Step::ExactChar('c'),
-                Step::MinOrMore('a', 1),
-                Step::ExactChar('t')
-            ]
-            .into_boxed_slice()
-        );
-        assert_eq!(
-            Context::from("ca+at").unwrap().steps,
-            vec![
-                Step::ExactChar('c'),
-                Step::MinOrMore('a', 2),
-                Step::ExactChar('t')
-            ]
-            .into_boxed_slice()
-        );
+        let ctx = Regex::from("ca+t").unwrap();
+        let mut iter = ctx.into_iter();
+        assert_eq!(iter.next(), Some(Step::ExactChar('c')));
+        assert_eq!(iter.next(), Some(Step::MinOrMore('a', 1)));
+        assert_eq!(iter.next(), Some(Step::ExactChar('t')));
+        assert_eq!(iter.next(), None);
+
+        let ctx = Regex::from("ca+at").unwrap();
+        let mut iter = ctx.into_iter();
+        assert_eq!(iter.next(), Some(Step::ExactChar('c')));
+        assert_eq!(iter.next(), Some(Step::MinOrMore('a', 2)));
+        assert_eq!(iter.next(), Some(Step::ExactChar('t')));
+        assert_eq!(iter.next(), None);
     }
 
     /*#[test]
@@ -142,22 +152,27 @@ mod tests {
 
     #[test]
     fn test_negative_character_groups() {
+        let ctx = Regex::from("[^xyz]").unwrap();
+        let mut iter = ctx.into_iter();
         assert_eq!(
-            Context::from("[^xyz]").unwrap().steps,
-            vec![Step::CharGroup(
+            iter.next(),
+            Some(Step::CharGroup(
                 vec!['x', 'y', 'z'].into_boxed_slice(),
                 true
-            )]
-            .into_boxed_slice()
+            ))
         );
+        assert_eq!(iter.next(), None);
+
+        let ctx = Regex::from("[abc]").unwrap();
+        let mut iter = ctx.into_iter();
         assert_eq!(
-            Context::from("[abc]").unwrap().steps,
-            vec![Step::CharGroup(
+            iter.next(),
+            Some(Step::CharGroup(
                 vec!['a', 'b', 'c'].into_boxed_slice(),
                 false
-            )]
-            .into_boxed_slice()
+            ))
         );
+        assert_eq!(iter.next(), None);
     }
 
     /*#[test]
