@@ -11,41 +11,44 @@ use anyhow::anyhow;
   [] Make iterators AsRef
 */
 
-const ALLOWED_SPECIAL_CHARS: [char; 5] = ['[', ']', '\\', '^', '$'];
+const ALLOWED_SPECIAL_CHARS: [char; 6] = ['[', ']', '\\', '^', '$', '+'];
 
 fn do_match(
-    mut input_iter: impl Iterator<Item = char>,
-    mut pattern_iter: impl Iterator<Item = char>,
+    input_iter: impl Iterator<Item = char>,
+    pattern_iter: impl Iterator<Item = char>,
 ) -> Result<bool, anyhow::Error> {
-    while let Some(pattern_char) = pattern_iter.next() {
+    let mut pattern_peek = pattern_iter.peekable();
+    let mut input_peek = input_iter.peekable();
+
+    while let Some(pattern_char) = pattern_peek.next() {
         if pattern_char == '$' {
             // end of string
-            return Ok(input_iter.next().is_none());
+            return Ok(input_peek.next().is_none());
         } else if pattern_char == '\\' {
-            match pattern_iter.next() {
+            match pattern_peek.next() {
                 Some('d') => {
-                    if !until_digit(input_iter.by_ref()) {
+                    if !until_digit(input_peek.by_ref()) {
                         return Ok(false);
                     }
                 }
                 Some('w') => {
-                    if !until_alphanumeric(input_iter.by_ref()) {
+                    if !until_alphanumeric(input_peek.by_ref()) {
                         return Ok(false);
                     }
                 }
                 Some(symbol) => {
                     // input is a special char that requires escape
                     if !(ALLOWED_SPECIAL_CHARS.contains(&symbol)
-                        && until_exact(&symbol, input_iter.by_ref()))
+                        && until_exact(&symbol, input_peek.by_ref()))
                     {
                         return Ok(false);
                     }
                 }
-                _ => return Err(anyhow!("Unhandlessd pattern")),
+                _ => return Err(anyhow!("Unhandled pattern")),
             }
         } else if pattern_char == '[' {
             // check for character group
-            let mut char_group = pattern_iter
+            let mut char_group = pattern_peek
                 .by_ref()
                 .take_while(|c| *c != ']')
                 .collect::<Vec<_>>();
@@ -56,14 +59,25 @@ fn do_match(
             };
             let res = if is_neg {
                 char_group.remove(0);
-                input_iter.any(|c| !char_group.contains(&c))
+                input_peek.any(|c| !char_group.contains(&c))
             } else {
-                input_iter.any(|c| char_group.contains(&c))
+                input_peek.any(|c| char_group.contains(&c))
             };
             return Ok(res);
         } else if pattern_char.is_ascii() {
-            if !until_exact(&pattern_char, input_iter.by_ref()) {
-                return Ok(false);
+            if let Some('+') = pattern_peek.peek() {
+                let _ = pattern_peek.next();
+                while let Some(peek) = input_peek.peek() {
+                    if *peek == pattern_char {
+                        let _ = input_peek.next();
+                    } else {
+                        break;
+                    }
+                }
+            } else {
+                if !until_exact(&pattern_char, input_peek.by_ref()) {
+                    return Ok(false);
+                }
             }
         } else {
             return Err(anyhow!("Unhandled pattern"));
