@@ -13,6 +13,7 @@ pub enum Step {
     ExactChar(char),
     MinOrMore(char, usize),
     StartOfString(Box<[char]>),
+    Wildcard,
     ZeroOrOne(char),
 }
 
@@ -39,6 +40,7 @@ impl Regex {
                     }
                 }
                 CHAR_GROUP_START => steps.push(Self::parse_char_group(iter.by_ref())),
+                WILDCARD => steps.push(Step::Wildcard),
                 exact_char => steps.push(Self::parse_exact_char(exact_char, iter.by_ref())),
             };
         }

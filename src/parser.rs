@@ -61,6 +61,11 @@ impl Parser {
                         }
                     }
                 }
+                Step::Wildcard => {
+                    if input_chars.next().is_none() {
+                        return false;
+                    }
+                }
                 Step::ZeroOrOne(c) => {
                     input_chars.next_if(|peek_char| *peek_char == c);
                 }

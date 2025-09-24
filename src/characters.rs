@@ -8,7 +8,8 @@ pub const ESCAPE_CHAR: char = '\\';
 pub const QUANTIFIER_NEG: char = '^';
 pub const QUANTIFIER_PLUS: char = '+';
 pub const QUANTIFIER_QUESTION: char = '?';
-pub const ALLOWED_SPECIAL_CHARS: [char; 7] = [
+pub const WILDCARD: char = '.';
+pub const ALLOWED_SPECIAL_CHARS: [char; 8] = [
     CHAR_GROUP_START,
     CHAR_GROUP_END,
     ESCAPE_CHAR,
@@ -16,4 +17,5 @@ pub const ALLOWED_SPECIAL_CHARS: [char; 7] = [
     ANCHOR_END,
     QUANTIFIER_PLUS,
     QUANTIFIER_QUESTION,
+    WILDCARD,
 ];
