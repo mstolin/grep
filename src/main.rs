@@ -8,6 +8,7 @@ use crate::characters::*;
 use anyhow::anyhow;
 
 mod characters;
+mod parser;
 
 /* TODO List:
   [] Custom structs for specifc pattern types (e.g. character groups)
