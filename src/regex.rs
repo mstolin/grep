@@ -5,18 +5,18 @@ use anyhow::anyhow;
 use crate::characters::*;
 
 #[derive(Debug, PartialEq)]
-enum Step {
+pub enum Step {
     AnyAlphanumerical,
     AnyDigit,
     CharGroup(Box<[char]>, bool),
     EndOfString,
     ExactChar(char),
     MinOrMore(char, usize),
-    StartOfString,
+    StartOfString(Box<[char]>),
     ZeroOrOne(char),
 }
 
-struct Regex {
+pub struct Regex {
     steps: VecDeque<Step>,
 }
 
@@ -26,7 +26,7 @@ impl Regex {
         let mut iter = pattern.chars().peekable();
         while let Some(pattern_char) = iter.next() {
             match pattern_char {
-                ANCHOR_START => steps.push(Step::StartOfString),
+                ANCHOR_START => steps.push(Self::parse_start_group(iter.by_ref())),
                 ANCHOR_END => steps.push(Step::EndOfString),
                 ESCAPE_CHAR => {
                     if let Some(next) = iter.next() {
@@ -81,16 +81,34 @@ impl Regex {
         }
     }
 
+    fn parse_char_group_while<I, F>(iter: &mut Peekable<I>, predicate: F) -> Box<[char]>
+    where
+        I: Iterator<Item = char>,
+        F: FnMut(&char) -> bool,
+    {
+        iter.take_while(predicate)
+            .collect::<Vec<_>>()
+            .into_boxed_slice()
+    }
+
     fn parse_char_group<I>(iter: &mut Peekable<I>) -> Step
     where
         I: Iterator<Item = char>,
     {
         let is_neg = iter.next_if(|c| *c == QUANTIFIER_NEG).is_some();
-        let char_group = iter
-            .take_while(|c| *c != CHAR_GROUP_END)
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
+        let char_group = Self::parse_char_group_while(iter, |c| *c != CHAR_GROUP_END);
         Step::CharGroup(char_group, is_neg)
+    }
+
+    fn parse_start_group<I>(iter: &mut Peekable<I>) -> Step
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut char_group = Vec::new();
+        while let Some(c) = iter.next_if(|c| *c != ANCHOR_END) {
+            char_group.push(c);
+        }
+        Step::StartOfString(char_group.into_boxed_slice())
     }
 }
 
