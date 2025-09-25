@@ -1,3 +1,6 @@
+pub const ALTERNATION: char = '|';
+pub const ALTERNATION_START: char = '(';
+pub const ALTERNATION_END: char = ')';
 pub const ANCHOR_START: char = '^';
 pub const ANCHOR_END: char = '$';
 pub const CHAR_CLASS_ALPHANUMERIC: char = 'w';
@@ -9,7 +12,10 @@ pub const QUANTIFIER_NEG: char = '^';
 pub const QUANTIFIER_PLUS: char = '+';
 pub const QUANTIFIER_QUESTION: char = '?';
 pub const WILDCARD: char = '.';
-pub const ALLOWED_SPECIAL_CHARS: [char; 8] = [
+pub const ALLOWED_SPECIAL_CHARS: [char; 11] = [
+    ALTERNATION,
+    ALTERNATION_START,
+    ALTERNATION_END,
     CHAR_GROUP_START,
     CHAR_GROUP_END,
     ESCAPE_CHAR,

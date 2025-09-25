@@ -8,6 +8,35 @@ impl Parser {
         let mut regex_iter = regex.into_iter().enumerate();
         while let Some((index, step)) = regex_iter.next() {
             match step {
+                Step::Alternation(a, b) => {
+                    let mut a_matches = 0;
+                    let mut b_matches = 0;
+                    while let Some(next) = input_chars.next() {
+                        if let Some(a_next) = a.get(a_matches) {
+                            if next == *a_next {
+                                a_matches += 1;
+                                if a_matches == a.len() {
+                                    break;
+                                }
+                            } else {
+                                a_matches = 0;
+                            }
+                        }
+                        if let Some(b_next) = b.get(b_matches) {
+                            if next == *b_next {
+                                b_matches += 1;
+                                if b_matches == b.len() {
+                                    break;
+                                }
+                            } else {
+                                b_matches = 0;
+                            }
+                        }
+                    }
+                    if !(a_matches == a.len() || b_matches == b.len()) {
+                        return false;
+                    }
+                }
                 Step::AnyAlphanumerical => {
                     if !Self::until_alphanumeric(input_chars.by_ref()) {
                         return false;

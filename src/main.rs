@@ -43,6 +43,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_wildcard() {
+        assert!(match_pattern("cat", "c.t"));
+        assert!(!match_pattern("car", "c.t"));
+        assert!(match_pattern("goøö0Ogol", "g.+gol"));
+        assert!(!match_pattern("gol", "g.+gol"));
+    }
+
+    #[test]
     fn test_match_one_or_more_times() {
         assert!(match_pattern("cat", "ca+t"));
         assert!(match_pattern("caaats", "ca+at"));

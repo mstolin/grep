@@ -6,6 +6,7 @@ use crate::characters::*;
 
 #[derive(Debug, PartialEq)]
 pub enum Step {
+    Alternation(Box<[char]>, Box<[char]>),
     AnyAlphanumerical,
     AnyDigit,
     CharGroup(Box<[char]>, bool),
@@ -34,6 +35,7 @@ impl Regex {
         let mut iter = pattern.chars().peekable();
         while let Some(pattern_char) = iter.next() {
             match pattern_char {
+                ALTERNATION_START => steps.push(Self::parse_alternation(iter.by_ref())),
                 ANCHOR_START => steps.push(Self::parse_start_group(iter.by_ref())),
                 ANCHOR_END => steps.push(Step::EndOfString),
                 ESCAPE_CHAR => {
@@ -58,6 +60,29 @@ impl Regex {
 }
 
 impl Regex {
+    fn parse_alternation<I>(iter: &mut Peekable<I>) -> Step
+    where
+        I: Iterator<Item = char>,
+    {
+        let mut fill_b = false;
+        let mut a = Vec::new();
+        let mut b = Vec::new();
+        while let Some(c) = iter.next() {
+            match c {
+                ALTERNATION_END => break,
+                ALTERNATION => fill_b = true,
+                _ => {
+                    if fill_b {
+                        b.push(c);
+                    } else {
+                        a.push(c);
+                    }
+                }
+            };
+        }
+        return Step::Alternation(a.into_boxed_slice(), b.into_boxed_slice());
+    }
+
     fn parse_escaped_char(escaped_char: char) -> Result<Step, anyhow::Error> {
         match escaped_char {
             CHAR_CLASS_ALPHANUMERIC => Ok(Step::AnyAlphanumerical),
