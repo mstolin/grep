@@ -7,12 +7,12 @@ use crate::characters::*;
 #[derive(Debug, PartialEq)]
 pub enum Step {
     Alternation(Box<[char]>, Box<[char]>),
-    AnyAlphanumerical,
-    AnyDigit,
+    AnyAlphanumerical, // TODO Obsolete -> ExactChar(mode)
+    AnyDigit,          // TODO Obsolete -> ExactChar(mode)
     CharGroup(Box<[char]>, bool),
     EndOfString,
     ExactChar(char),
-    MinOrMore(char, usize),
+    MinOrMore(MinOrMoreMode, usize),
     StartOfString(Box<[char]>),
     Wildcard(WildcardMatchMode),
     ZeroOrOne(char),
@@ -23,6 +23,13 @@ pub enum WildcardMatchMode {
     Single,
     Until(char),
     Endless,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum MinOrMoreMode {
+    AnyAlphanumerical,
+    AnyDigit,
+    Exact(char),
 }
 
 pub struct Regex {
@@ -40,7 +47,7 @@ impl Regex {
                 ANCHOR_END => steps.push(Step::EndOfString),
                 ESCAPE_CHAR => {
                     if let Some(next) = iter.next() {
-                        match Self::parse_escaped_char(next) {
+                        match Self::parse_escaped_char(next, iter.by_ref()) {
                             Ok(step) => steps.push(step),
                             Err(e) => return Err(e),
                         }
@@ -83,13 +90,36 @@ impl Regex {
         return Step::Alternation(a.into_boxed_slice(), b.into_boxed_slice());
     }
 
-    fn parse_escaped_char(escaped_char: char) -> Result<Step, anyhow::Error> {
+    fn parse_escaped_char<I>(
+        escaped_char: char,
+        iter: &mut Peekable<I>,
+    ) -> Result<Step, anyhow::Error>
+    where
+        I: Iterator<Item = char>,
+    {
+        let is_next_plus = iter.next_if_eq(&QUANTIFIER_PLUS).is_some();
         match escaped_char {
-            CHAR_CLASS_ALPHANUMERIC => Ok(Step::AnyAlphanumerical),
-            CHAR_CLASS_DIGIT => Ok(Step::AnyDigit),
+            CHAR_CLASS_ALPHANUMERIC => {
+                if is_next_plus {
+                    Ok(Step::MinOrMore(MinOrMoreMode::AnyAlphanumerical, 1))
+                } else {
+                    Ok(Step::AnyAlphanumerical)
+                }
+            }
+            CHAR_CLASS_DIGIT => {
+                if is_next_plus {
+                    Ok(Step::MinOrMore(MinOrMoreMode::AnyDigit, 1))
+                } else {
+                    Ok(Step::AnyDigit)
+                }
+            }
             _ => {
-                if ALLOWED_SPECIAL_CHARS.contains(&escaped_char) {
-                    Ok(Step::ExactChar(escaped_char))
+                if SPECIAL_CHARS.contains(&escaped_char) {
+                    if is_next_plus {
+                        Ok(Step::MinOrMore(MinOrMoreMode::Exact(escaped_char), 1))
+                    } else {
+                        Ok(Step::ExactChar(escaped_char))
+                    }
                 } else {
                     Err(anyhow!("Unhandled escaped pattern \\{escaped_char}"))
                 }
@@ -107,7 +137,7 @@ impl Regex {
             while iter.next_if_eq(&exact_char).is_some() {
                 n += 1;
             }
-            Step::MinOrMore(exact_char, 1 + n)
+            Step::MinOrMore(MinOrMoreMode::Exact(exact_char), 1 + n)
         } else if iter.next_if_eq(&QUANTIFIER_QUESTION).is_some() {
             Step::ZeroOrOne(exact_char)
         } else {
@@ -139,7 +169,7 @@ impl Regex {
         I: Iterator<Item = char>,
     {
         let mut char_group = Vec::new();
-        while let Some(c) = iter.next_if(|c| *c != ANCHOR_END) {
+        while let Some(c) = iter.next_if(|c| !SPECIAL_CHARS.contains(c)) {
             char_group.push(c);
         }
         Step::StartOfString(char_group.into_boxed_slice())
@@ -180,14 +210,20 @@ mod tests {
         let ctx = Regex::from("ca+t").unwrap();
         let mut iter = ctx.into_iter();
         assert_eq!(iter.next(), Some(Step::ExactChar('c')));
-        assert_eq!(iter.next(), Some(Step::MinOrMore('a', 1)));
+        assert_eq!(
+            iter.next(),
+            Some(Step::MinOrMore(MinOrMoreMode::Exact('a'), 1))
+        );
         assert_eq!(iter.next(), Some(Step::ExactChar('t')));
         assert_eq!(iter.next(), None);
 
         let ctx = Regex::from("ca+at").unwrap();
         let mut iter = ctx.into_iter();
         assert_eq!(iter.next(), Some(Step::ExactChar('c')));
-        assert_eq!(iter.next(), Some(Step::MinOrMore('a', 2)));
+        assert_eq!(
+            iter.next(),
+            Some(Step::MinOrMore(MinOrMoreMode::Exact('a'), 2))
+        );
         assert_eq!(iter.next(), Some(Step::ExactChar('t')));
         assert_eq!(iter.next(), None);
     }

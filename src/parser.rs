@@ -66,9 +66,15 @@ impl Parser {
                         return false;
                     }
                 }
-                Step::MinOrMore(c, min) => {
+                Step::MinOrMore(mode, min) => {
                     let mut n = 0;
-                    while let Some(_) = input_chars.next_if(|peek_char| *peek_char == c) {
+                    while let Some(_) = input_chars.next_if(|peek_char| match mode {
+                        crate::regex::MinOrMoreMode::AnyAlphanumerical => {
+                            peek_char.is_ascii_alphanumeric()
+                        }
+                        crate::regex::MinOrMoreMode::AnyDigit => peek_char.is_ascii_digit(),
+                        crate::regex::MinOrMoreMode::Exact(c) => *peek_char == c,
+                    }) {
                         n += 1;
                     }
                     if n < min {

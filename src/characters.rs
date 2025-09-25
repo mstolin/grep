@@ -12,7 +12,7 @@ pub const QUANTIFIER_NEG: char = '^';
 pub const QUANTIFIER_PLUS: char = '+';
 pub const QUANTIFIER_QUESTION: char = '?';
 pub const WILDCARD: char = '.';
-pub const ALLOWED_SPECIAL_CHARS: [char; 11] = [
+pub const SPECIAL_CHARS: [char; 11] = [
     ALTERNATION,
     ALTERNATION_START,
     ALTERNATION_END,
