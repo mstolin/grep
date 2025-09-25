@@ -13,8 +13,15 @@ pub enum Step {
     ExactChar(char),
     MinOrMore(char, usize),
     StartOfString(Box<[char]>),
-    Wildcard,
+    Wildcard(WildcardMatchMode),
     ZeroOrOne(char),
+}
+
+#[derive(Debug, PartialEq)]
+pub enum WildcardMatchMode {
+    Single,
+    Until(char),
+    Endless,
 }
 
 pub struct Regex {
@@ -40,7 +47,7 @@ impl Regex {
                     }
                 }
                 CHAR_GROUP_START => steps.push(Self::parse_char_group(iter.by_ref())),
-                WILDCARD => steps.push(Step::Wildcard),
+                WILDCARD => steps.push(Self::parse_wildcard(iter.by_ref())),
                 exact_char => steps.push(Self::parse_exact_char(exact_char, iter.by_ref())),
             };
         }
@@ -111,6 +118,21 @@ impl Regex {
             char_group.push(c);
         }
         Step::StartOfString(char_group.into_boxed_slice())
+    }
+
+    fn parse_wildcard<I>(iter: &mut Peekable<I>) -> Step
+    where
+        I: Iterator<Item = char>,
+    {
+        if iter.next_if_eq(&QUANTIFIER_PLUS).is_some() {
+            if let Some(peek) = iter.peek() {
+                Step::Wildcard(WildcardMatchMode::Until(*peek))
+            } else {
+                Step::Wildcard(WildcardMatchMode::Endless)
+            }
+        } else {
+            Step::Wildcard(WildcardMatchMode::Single)
+        }
     }
 }
 

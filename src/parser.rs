@@ -1,4 +1,4 @@
-use crate::regex::{Regex, Step};
+use crate::regex::{Regex, Step, WildcardMatchMode};
 
 pub struct Parser;
 
@@ -61,10 +61,18 @@ impl Parser {
                         }
                     }
                 }
-                Step::Wildcard => {
-                    if input_chars.next().is_none() {
-                        return false;
-                    }
+                Step::Wildcard(mode) => {
+                    match mode {
+                        WildcardMatchMode::Single => {
+                            if input_chars.next().is_none() {
+                                return false;
+                            }
+                        }
+                        WildcardMatchMode::Until(c) => {
+                            while input_chars.next_if(|n| *n != c).is_some() {}
+                        }
+                        WildcardMatchMode::Endless => while input_chars.next().is_some() {},
+                    };
                 }
                 Step::ZeroOrOne(c) => {
                     input_chars.next_if(|peek_char| *peek_char == c);
