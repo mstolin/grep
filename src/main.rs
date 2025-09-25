@@ -43,6 +43,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_alternation() {
+        assert!(match_pattern("a cat", "a (cat|dog)"));
+        assert!(!match_pattern("a cow", "a (cat|dog)"));
+        assert!(match_pattern("I see 1 cat", r"^I see \d+ (cat|dog)s?$"));
+        assert!(!match_pattern("gol", "g.+gol"));
+    }
+
+    #[test]
     fn test_wildcard() {
         assert!(match_pattern("cat", "c.t"));
         assert!(!match_pattern("car", "c.t"));
