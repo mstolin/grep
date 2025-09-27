@@ -14,7 +14,13 @@ mod regex;
 
 fn match_line(input_line: &str, pattern: &str) -> bool {
     match Regex::from(pattern) {
-        Ok(re) => Parser::parse(input_line, re),
+        Ok(re) => {
+            let res = Parser::parse(input_line, re);
+            if res {
+                println!("{input_line}");
+            }
+            res
+        }
         Err(e) => panic!("{e}"),
     }
 }
