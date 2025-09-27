@@ -61,10 +61,8 @@ fn main() {
     };
 
     if res {
-        println!("Y");
         process::exit(0)
     } else {
-        println!("N");
         process::exit(1)
     }
 }
