@@ -1,5 +1,8 @@
 use std::env;
-use std::io;
+use std::fs::File;
+use std::io::{self, BufRead};
+use std::io::{BufReader, Lines};
+use std::path::PathBuf;
 use std::process;
 
 use crate::parser::Parser;
@@ -9,11 +12,25 @@ mod characters;
 mod parser;
 mod regex;
 
-fn match_pattern(input_line: &str, pattern: &str) -> bool {
+fn match_line(input_line: &str, pattern: &str) -> bool {
     match Regex::from(pattern) {
         Ok(re) => Parser::parse(input_line, re),
         Err(e) => panic!("{e}"),
     }
+}
+
+fn match_file_lines(mut lines: Lines<BufReader<File>>, pattern: &str) -> std::io::Result<bool> {
+    while let Some(input_line) = lines.next() {
+        if !match_line(&input_line?, &pattern) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+fn read_file(path: PathBuf) -> Result<BufReader<File>, anyhow::Error> {
+    let file = File::open(path)?;
+    Ok(BufReader::new(file))
 }
 
 // Usage: echo <input_text> | your_program.sh -E <pattern>
@@ -24,12 +41,20 @@ fn main() {
     }
 
     let pattern = env::args().nth(2).unwrap();
-    let mut input_line = String::new();
 
-    io::stdin().read_line(&mut input_line).unwrap();
+    let res = if let Some(input_path) = env::args().nth(3) {
+        let reader = read_file(input_path.into()).unwrap_or_else(|err| panic!("{err}"));
+        match match_file_lines(reader.lines(), &pattern) {
+            Ok(res) => res,
+            Err(err) => panic!("{err}"),
+        }
+    } else {
+        let mut input_line = String::new();
+        io::stdin().read_line(&mut input_line).unwrap();
+        match_line(&input_line, &pattern)
+    };
 
-    // Uncomment this block to pass the first stage
-    if match_pattern(&input_line, &pattern) {
+    if res {
         println!("Y");
         process::exit(0)
     } else {
@@ -44,87 +69,87 @@ mod tests {
 
     #[test]
     fn test_alternation() {
-        assert!(match_pattern("a cat", "a (cat|dog)"));
-        assert!(!match_pattern("a cow", "a (cat|dog)"));
-        assert!(match_pattern("I see 1 cat", r"^I see \d+ (cat|dog)s?$"));
-        assert!(!match_pattern("gol", "g.+gol"));
+        assert!(match_line("a cat", "a (cat|dog)"));
+        assert!(!match_line("a cow", "a (cat|dog)"));
+        assert!(match_line("I see 1 cat", r"^I see \d+ (cat|dog)s?$"));
+        assert!(!match_line("gol", "g.+gol"));
     }
 
     #[test]
     fn test_wildcard() {
-        assert!(match_pattern("cat", "c.t"));
-        assert!(!match_pattern("car", "c.t"));
-        assert!(match_pattern("goøö0Ogol", "g.+gol"));
-        assert!(!match_pattern("gol", "g.+gol"));
+        assert!(match_line("cat", "c.t"));
+        assert!(!match_line("car", "c.t"));
+        assert!(match_line("goøö0Ogol", "g.+gol"));
+        assert!(!match_line("gol", "g.+gol"));
     }
 
     #[test]
     fn test_match_one_or_more_times() {
-        assert!(match_pattern("cat", "ca+t"));
-        assert!(match_pattern("caaats", "ca+at"));
-        assert!(!match_pattern("act", "ca+t"));
-        assert!(!match_pattern("ca", "ca+t"));
+        assert!(match_line("cat", "ca+t"));
+        assert!(match_line("caaats", "ca+at"));
+        assert!(!match_line("act", "ca+t"));
+        assert!(!match_line("ca", "ca+t"));
     }
 
     #[test]
     fn test_end_of_string_anchor() {
-        assert!(match_pattern("grape_raspberry", "raspberry$"));
-        assert!(!match_pattern("raspberry_grape", "raspberry$"));
-        assert!(match_pattern("mango", "^mango$"));
-        assert!(!match_pattern("mango_mango", "^mango$"));
+        assert!(match_line("grape_raspberry", "raspberry$"));
+        assert!(!match_line("raspberry_grape", "raspberry$"));
+        assert!(match_line("mango", "^mango$"));
+        assert!(!match_line("mango_mango", "^mango$"));
     }
 
     #[test]
     fn test_start_of_string_anchor() {
-        assert!(match_pattern("apple_mango", "^apple"));
-        assert!(!match_pattern("mango_apple", "^apple"));
+        assert!(match_line("apple_mango", "^apple"));
+        assert!(!match_line("mango_apple", "^apple"));
     }
 
     #[test]
     fn test_combining_character_classes() {
-        assert!(match_pattern("sally has 3 apples", r"\d apple"));
-        assert!(!match_pattern("sally has 1 orange", r"\d apple"));
-        assert!(match_pattern("sally has 124 apples", r"\d\d\d apples"));
-        assert!(!match_pattern("sally has 12 apples", r"\d\d\d apples"));
-        assert!(match_pattern("sally has 3 dogs", r"\d \w\w\ws"));
-        assert!(match_pattern("sally has 4 dogs", r"\d \w\w\ws"));
-        assert!(!match_pattern("sally has 1 dog", r"\d \w\w\ws"));
+        assert!(match_line("sally has 3 apples", r"\d apple"));
+        assert!(!match_line("sally has 1 orange", r"\d apple"));
+        assert!(match_line("sally has 124 apples", r"\d\d\d apples"));
+        assert!(!match_line("sally has 12 apples", r"\d\d\d apples"));
+        assert!(match_line("sally has 3 dogs", r"\d \w\w\ws"));
+        assert!(match_line("sally has 4 dogs", r"\d \w\w\ws"));
+        assert!(!match_line("sally has 1 dog", r"\d \w\w\ws"));
     }
 
     #[test]
     fn test_negative_character_groups() {
-        assert!(match_pattern("apple", "[^xyz]"));
-        assert!(match_pattern("apple", "[^abc]"));
-        assert!(!match_pattern("banana", "[^anb]"));
-        assert!(match_pattern("orange", "[^opq]"));
+        assert!(match_line("apple", "[^xyz]"));
+        assert!(match_line("apple", "[^abc]"));
+        assert!(!match_line("banana", "[^anb]"));
+        assert!(match_line("orange", "[^opq]"));
     }
 
     #[test]
     fn test_positive_character_groups() {
-        assert!(match_pattern("u", "[blueberry]"));
-        assert!(match_pattern("uac", "[blueberry]"));
-        assert!(!match_pattern("orange", "[bcdfhi]"));
-        assert!(!match_pattern("[]", "[pear]"));
+        assert!(match_line("u", "[blueberry]"));
+        assert!(match_line("uac", "[blueberry]"));
+        assert!(!match_line("orange", "[bcdfhi]"));
+        assert!(!match_line("[]", "[pear]"));
     }
 
     #[test]
     fn test_match_word_characters() {
-        assert!(match_pattern("blueberry", r"\w"));
-        assert!(match_pattern("BANANA", r"\w"));
-        assert!(match_pattern("656", r"\w"));
-        assert!(match_pattern("#+%_+#×", r"\w"));
-        assert!(!match_pattern("=#÷+×-", r"\w"));
+        assert!(match_line("blueberry", r"\w"));
+        assert!(match_line("BANANA", r"\w"));
+        assert!(match_line("656", r"\w"));
+        assert!(match_line("#+%_+#×", r"\w"));
+        assert!(!match_line("=#÷+×-", r"\w"));
     }
 
     #[test]
     fn test_match_digits() {
-        assert!(match_pattern("123", r"\d"));
-        assert!(!match_pattern("apple", r"\d"));
+        assert!(match_line("123", r"\d"));
+        assert!(!match_line("apple", r"\d"));
     }
 
     #[test]
     fn test_match_literal_character() {
-        assert!(match_pattern("dog", "d"));
-        assert!(!match_pattern("dog", "f"));
+        assert!(match_line("dog", "d"));
+        assert!(!match_line("dog", "f"));
     }
 }
