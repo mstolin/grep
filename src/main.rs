@@ -11,6 +11,7 @@ use crate::regex::Regex;
 mod characters;
 mod parser;
 mod regex;
+mod walker;
 
 fn match_line(input_line: &str, pattern: &str) -> Result<bool, anyhow::Error> {
     let re = Regex::from(pattern)?;
@@ -46,12 +47,23 @@ fn main() {
 
     let pattern = env::args().nth(2).unwrap();
 
-    let matched_lines = if let Some(input_path) = env::args().nth(3) {
-        let reader = read_file(input_path.into()).unwrap_or_else(|err| panic!("{err}"));
-        match match_file_lines(reader.lines(), &pattern) {
-            Ok(matches) => matches,
-            Err(err) => panic!("{err}"),
+    let matched_lines = if env::args().len() >= 3 {
+        // TODO Don't use bufreader here
+        let mut args_iter = env::args().into_iter().skip(3);
+        let mut all_matches = Vec::new();
+        while let Some(file_path) = args_iter.next() {
+            let reader = read_file(file_path.into()).unwrap_or_else(|err| panic!("{err}"));
+            match match_file_lines(reader.lines(), &pattern) {
+                Ok(matches) => {
+                    let mut matches_iter = matches.iter();
+                    while let Some(next) = matches_iter.next() {
+                        all_matches.push(next.into());
+                    }
+                }
+                Err(err) => panic!("{err}"),
+            }
         }
+        all_matches.into_boxed_slice()
     } else {
         let mut input_line = String::new();
         io::stdin().read_line(&mut input_line).unwrap();
@@ -60,7 +72,7 @@ fn main() {
                 if res {
                     vec![input_line].into_boxed_slice()
                 } else {
-                    Box::from([])
+                    Box::new([])
                 }
             }
             Err(err) => panic!("{err}"),
